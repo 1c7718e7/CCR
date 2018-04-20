@@ -1,0 +1,21 @@
+Usage
+=====
+
+1. Write in the grey square, back button erases last stroke
+2. Selecting one result will copy it to clipboard and highlight your errors, if any.
+3. Drawing right after selecting a result clears the screen.
+4. Pressing the back button when there are no stroke exits the app.
+
+Building
+========
+
+NB: code in jni/ depends on ccr library being in ../lib
+Run ndk-build to build the native library, then proceed with ant as usual.
+
+Outline
+=======
+
+KCanvas is the canvas on which the user writes, also it shows errors
+KMenu shows a grid of charachers to the user, lets them pick one.
+Worker spawns a background thread, asynchronously does lookups.
+CCRActivity glues everything together.
