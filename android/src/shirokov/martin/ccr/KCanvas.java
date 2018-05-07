@@ -161,10 +161,10 @@ public class KCanvas extends View {
 		}
 	}
 
-	@Override
-	public void onDraw(Canvas c)
+	private void drawKanji(Canvas c)
 	{
 		c.drawColor(BG_COLOR);
+		c.save();
 		c.scale(mSize, mSize, 0, 0);
 		int ofs = 0;
 		mPaint.setColor(FG_COLOR);
@@ -193,6 +193,32 @@ public class KCanvas extends View {
 					drawStroke(c, mFeedback.kanji.pointv, ofs, mFeedback.kanji.sizev[i]);
 				ofs += mFeedback.kanji.sizev[i]*2;
 			}
+		}
+		c.restore();
+	}
+
+	private void drawCenteredText(Canvas c, Paint p, String s, float x, float y)
+	{
+		Rect bb = new Rect();
+		p.getTextBounds(s, 0, s.length(), bb);
+		x -= bb.centerX();
+		y -= bb.centerY();
+		c.drawText(s, x, y, p);
+	}
+
+	@Override
+	public void onDraw(Canvas c)
+	{
+		if (mKanji.sizec == 0) {
+			c.drawColor(BG_COLOR);
+			mPaint.setColor(FG_COLOR);
+			mPaint.setTextSize(mSize/8.f);
+			drawCenteredText(c, mPaint, "Write here", mSize/2, mSize/2);
+		} else {
+			drawKanji(c);
+			mPaint.setColor(FG_COLOR);
+			mPaint.setTextSize(mSize/20.f);
+			drawCenteredText(c, mPaint, "Click on a search result to copy it", mSize/2, mSize*0.95f);
 		}
 	}
 
