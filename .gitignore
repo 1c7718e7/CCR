@@ -1,8 +1,6 @@
 .*
 /kanji.*
 *.bak
-/data/*
-!/data/*.sh
 *.o
 *.elf
 !.gitignore
