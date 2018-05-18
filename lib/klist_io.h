@@ -36,6 +36,7 @@ struct klist {
 typedef struct klist KList;
 
 int klist_fread(KList *kl, FILE *f);
+void klist_fwrite(const KList *kl, FILE *f);
 int klist_parse(KList *kl, char **p, char *end);
 void klist_init(KList *kl);
 void klist_fini(KList *kl);

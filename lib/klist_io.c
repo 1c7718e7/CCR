@@ -195,3 +195,20 @@ int klist_fread(KList *kl, FILE *f)
 		return 1;
 	return r;
 }
+
+void klist_fwrite(const KList *kl, FILE *f)
+{
+	int ki, si, pi;
+	fprintf(f, "%u %u %u\n", kl->kanjic, kl->strokec, kl->pointc);
+	for (ki = 0; ki < kl->kanjic; ki++) {
+		const Kanji *k = kl->kanjiv + ki;
+		fprintf(f, "%"PRIu32" %u\n", k->code, k->n);
+		for (si = 0; si < k->n; si++) {
+			Stroke *s = k->p + si;
+			assert(s->n);
+			for (pi = 0; pi < s->n-1; pi++)
+				printf("%lf %lf ", s->p[pi].x, s->p[pi].y);
+			printf("%lf %lf\n", s->p[pi].x, s->p[pi].y);
+		}
+	}
+}
