@@ -35,6 +35,7 @@ struct klist {
 };
 typedef struct klist KList;
 
+int klist_append_copy(KList *kl, const Kanji *k);
 int klist_fread(KList *kl, FILE *f);
 void klist_fwrite(const KList *kl, FILE *f);
 int klist_parse(KList *kl, char **p, char *end);

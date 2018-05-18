@@ -77,6 +77,69 @@ static double getfloat(char **_p, char *end, int *err)
 	return a;
 }
 
+static int maybe_realloc(KList *kl, uint kc, uint sc, uint pc)
+{
+	if (kc > kl->kanjim) {
+		kl->kanjim *= 2;
+		if (kc > kl->kanjim)
+			kl->kanjim = kc;
+		kl->kanjiv = realloc(kl->kanjiv, kl->kanjim * sizeof *kl->kanjiv);
+		if (!kl->kanjiv)
+			return 0;
+	}
+	if (sc > kl->strokem) {
+		kl->strokem *= 2;
+		if (sc > kl->strokem)
+			kl->strokem = sc;
+		Stroke *s_old = kl->strokev;
+		kl->strokev = realloc(kl->strokev, kl->strokem * sizeof *kl->strokev);
+		if (!kl->strokev)
+			return 0;
+		for (int ki = 0; ki < kl->kanjic; ki++)
+			kl->kanjiv[ki].p = kl->strokev + (kl->kanjiv[ki].p - s_old);
+	}
+	if (pc > kl->pointm) {
+		kl->pointm *= 2;
+		if (pc > kl->pointm)
+			kl->pointm = pc;
+		Vec2 *p_old = kl->pointv;
+		kl->pointv = realloc(kl->pointv, kl->pointm * sizeof *kl->pointv);
+		if (!kl->pointv)
+			return 0;
+		for (int si = 0; si < kl->strokec; si++)
+			kl->strokev[si].p = kl->pointv + (kl->strokev[si].p - p_old);
+	}
+	kl->kanjic = kc;
+	kl->strokec = sc;
+	kl->pointc = pc;
+	return 1;
+}
+
+int klist_append_copy(KList *kl, const Kanji *src)
+{
+	int ki = kl->kanjic;
+	int si = kl->strokec;
+	int pi = kl->pointc;
+	int pc = 0;
+	for (int i = 0; i < src->n; i++)
+		pc += src->p[i].n;
+	DEBUG("APPEND %i %i\n", src->n, pc);
+	if (!maybe_realloc(kl, kl->kanjic+1, kl->strokec+src->n, kl->pointc+pc))
+		return 0;
+	Kanji *k = kl->kanjiv+ki;
+	k->n = src->n;
+	k->code = src->code;
+	k->p = kl->strokev+si;
+	for (int i = 0; i < k->n; i++) {
+		Stroke *s = k->p + i;
+		s->n = src->p[i].n;
+		s->p = kl->pointv+pi;
+		pi += s->n;
+		for (int j = 0; j < s->n; j++)
+			s->p[j] = src->p[i].p[j];
+	}
+	return 1;
+}
 
 int klist_parse(KList *kl, char **p, char *end)
 {
