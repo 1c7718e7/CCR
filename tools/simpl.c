@@ -14,72 +14,52 @@
  * You should have received a copy of the GNU General Public License
  * along with CCR.  If not, see <http://www.gnu.org/licenses/>.
  */
+#define _POSIX_C_SOURCE 200809L
 #include "std.h"
 #include <math.h>
 #include "ccr.h"
+#include <stdio.h>
+#include "klist_io.h"
 #include "svg.h"
 
-/* read svg path data and output simplified strokes */
-
-#define KANJIVG_SCALE (1.0/109)
-
 #define MAXSAMPLES 512000
-#define MAXSTROKES 320000
 
 static struct {
-	uint n, o;
+	uint ofs, n;
 	Vec2 p[MAXSAMPLES];
 } smp;
 
-static Stroke stroke_buf[MAXSTROKES];
-static Kanji stk = {0, 0xFFFF, stroke_buf};
-
-static void output_stroke(Stroke *s)
+static void new_kanji()
 {
-	uint i;
-
-#if 1
-	printf("%.5lf %.5lf", s->p[0].x, s->p[0].y);
-	ran (i, 1, s->n)
-		printf(" %.5lf %.5lf", s->p[i].x, s->p[i].y);
-	putchar('\n');
-#else
-	printf("M%lf %lf", s->p[0].x*109, s->p[0].y*109);
-	ran (i, 1, s->n)
-		printf("L%.5lf %.5lf", s->p[i].x*109, s->p[i].y*109);
-	putchar('\n');
-#endif
+	smp.n = 0;
+	smp.ofs = 0;
 }
 
-static void push_kanji(u32 code)
+static Vec2 *new_stroke()
 {
-	uint i;
-	kanji_normalize(&stk);
-
-	printf("%u %u\n", code, stk.n);
-	rep (i, stk.n)
-		output_stroke(stk.p + i);
+	smp.n = 0;
+	return smp.p + smp.ofs;
 }
 
-static void push_stroke()
+static uint end_stroke()
 {
-	const uint n = smp.n - smp.o;
-	if (n < 1)
-		return;
-	if (stk.n == MAXSTROKES)
-		exit_error("too many strokes\n");
-	stk.p[stk.n] = (Stroke) { n, smp.p + smp.o };
-	stroke_simplify(stk.p + stk.n);
-	stk.n++;
-	smp.o = smp.n;
+	Stroke s;
+	smp.ofs -= smp.n;
+	s.p = smp.p+smp.ofs;
+	s.n = smp.n;
+	stroke_simplify(&s);
+	smp.ofs += s.n;
+	return s.n;
 }
 
-static void push_point(Vec2 p)
+static void new_point(Vec2 v)
 {
-	if (smp.n == MAXSAMPLES)
+	if (smp.ofs+1 >= MAXSAMPLES)
 		exit_error("too many points\n");
-
-	smp.p[smp.n++] = p;
+	smp.p[smp.ofs].x = v.x;
+	smp.p[smp.ofs].y = v.y;
+	smp.ofs++;
+	smp.n++;
 }
 
 static Vec2 bezier(Vec2 p[4], double t)
@@ -109,7 +89,7 @@ static void do_curve_aux(Vec2 p[4], Vec2 A, Vec2 B, double a, double b)
 	m += tmp*tmp;
 	DEBUG("DELTA² %lf\n", m);
 	if (m < 1./256) {
-		push_point(B);
+		new_point(B);
 	} else {
 		m = (a + b)/2;
 		M = bezier(p, m);
@@ -120,50 +100,67 @@ static void do_curve_aux(Vec2 p[4], Vec2 A, Vec2 B, double a, double b)
 
 static void do_curve(Vec2 p[4])
 {
-	push_point(p[0]);
+	new_point(p[0]);
 	do_curve_aux(p, p[0], p[3], 0, 1);
 }
 
 static void svg_callback(void *_, double *p, unsigned n)
 {
+	if (n > 4)
+		exit_error("cubic splines not supported");
 	Vec2 v[4];
 	uint i;
 
 	rep (i, n) {
-		v[i].x = p[2*i+0]*KANJIVG_SCALE;
-		v[i].y = p[2*i+1]*KANJIVG_SCALE;
+		v[i].x = p[2*i+0]*(1.0/109);
+		v[i].y = p[2*i+1]*(1.0/109);
 	}
 	if (n == 4)
 		do_curve(v);
 	else if (n == 2) {
-		push_point(v[0]);
-		push_point(v[1]);
+		new_point(v[0]);
+		new_point(v[1]);
 	}
 }
 
 int main(int argc, char *argv[])
 {
+	int kanji_cnt;
+	struct klist klist;
 	SvgState svg;
-	int i;
-	u32 c;
+	Kanji kbuf;
+	Stroke sbuf[KANJI_MAXSTROKES];
+	int kanji_i, stroke_i, point_i;
+	char *linebuf;
+	size_t linebuf_size;
 
-	if (argc != 2) {
-		exit_error("usage: simpl <code_point> < <svg_data>");
-	}
-	c = strtol(argv[1], 0, 0);
-reset:
-	svg_start(&svg, svg_callback, NULL);
-	while ((i = getchar()) != EOF) {
-		if (svg_feedc(&svg, i))
-			exit_error("error on %c\n", (char)i);
-		if (i == '\n') {
-			push_stroke();
-			goto reset;
+	if (argc != 1)
+		exit_error("usage: simpl < <svg_data> > <klist>");
+	linebuf_size = 0;
+	linebuf = NULL;
+	kbuf.p = sbuf;
+	if (1 != scanf("%i", &kanji_cnt))
+		exit_error("number expected");
+	klist_init(&klist);
+	for (kanji_i = 0; kanji_i < kanji_cnt; kanji_i++) {
+		if (2 != scanf("%"SCNu32"%u ", &kbuf.code, &kbuf.n))
+			exit_error("kanji expected");
+		point_i = 0;
+		new_kanji();
+		for (stroke_i = 0; stroke_i < kbuf.n; stroke_i++) {
+			Stroke *s = kbuf.p + stroke_i;
+			s->p = new_stroke();
+			svg_start(&svg, svg_callback, s);
+			ssize_t len = getline(&linebuf, &linebuf_size, stdin);
+			if (len < 0)
+				exit_error("stroke expected");
+			svg_feeds(&svg, linebuf, len);
+			s->n = end_stroke();
 		}
+		kanji_normalize(&kbuf);
+		klist_append_copy(&klist, &kbuf);
 	}
-	push_kanji(c);
-	if (ferror(stdin))
-		exit_perror("getchar");
+	klist_fwrite(&klist, stdout);
+	klist_fini(&klist);
 	return 0;
 }
-

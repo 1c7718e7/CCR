@@ -20,7 +20,7 @@ all: simpl.elf sdl.elf test_metric.elf bench_db_open.elf dump_distmat.elf\
 sdl.elf: CFLAGS += $(SDL_CFLAGS)
 sdl.elf: LDFLAGS += $(SDL_LDFLAGS)
 
-simpl.elf: simpl.o kanji.o std.o svg.o
+simpl.elf: simpl.o kanji.o std.o svg.o klist_io.o
 
 sdl.elf: sdl.o std.o kanji.o $(DIST_IMPL) $(LOOKUP_IMPL) gfx.o
 

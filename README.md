@@ -15,13 +15,16 @@ Build the tools, they don't require any libraries:
 ```
 $ make -C tools simpl.elf makesc.elf
 ```
-Download the KanjiVG "all" database to `data/`:
+Make sure KanjiVG repo is cloned:
 ```
-$ wget https://github.com/KanjiVG/kanjivg/releases/download/r20160426/kanjivg-20160426-all.zip -O data/kanjivg-20160426-all.zip
-$ ./data/build.sh
+$ git submodule update --init data/kanjivg
+```
+Build ./kanji.list from KanjiVG.
+```
+$ ./data/kanjivg.py
 ```
 ./kanji.list should now exist.
-Build kanji.sc:
+Build ./kanji.sc:
 ```
 $ ./tools/makesc.elf < kanji.list > kanji.sc
 ```
@@ -40,12 +43,13 @@ Proceed with ant as usual, e.g:
 $ ant debug
 ```
 
-Build the SDL frontend. It needs SDL 1.X, edit `tools/config.mk` if needed:
+To build the SDL frontend:
 ```
 $ make -C tools sdl.elf
 ```
 On launch sdl.elf opens `./kanji.sc` (in the current working dir).
 Compile `sdl.c` with `-DDB_FILE=<other path>` if desired.
+The SDL frontend requires SDL 1.x libraries, edit `data/config.mk` if needed.
 
 Outline of the algorithm
 ========================
