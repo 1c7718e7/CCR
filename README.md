@@ -63,6 +63,12 @@ measure of how dissimilar strokes a and b are . Then we find a minimum weight
 perfect matching (aka optimal assignment). The weight of this matching is how dissimilar
 `A` and `B` is.
 
+TODO/Wishlist
+=============
+
+- after a match, display a high quality drawing, not a simplified one
+- display errors in stroke order
+
 Files
 =====
 
