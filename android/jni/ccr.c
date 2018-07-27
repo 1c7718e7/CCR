@@ -129,7 +129,6 @@ static void *load_kanji(JNIEnv *env, Kanji *k, jobject _k)
 			DEBUG("POINT %lf,%lf\n", vv->x, vv->y);
 			vv++;
 		}
-		stroke_simplify(k->p+i);
 	}
 
 	(*env)->ReleaseDoubleArrayElements(env, _pointv, pointv, 0);

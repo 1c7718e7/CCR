@@ -43,13 +43,7 @@ static Vec2 *new_stroke()
 
 static uint end_stroke()
 {
-	Stroke s;
-	smp.ofs -= smp.n;
-	s.p = smp.p+smp.ofs;
-	s.n = smp.n;
-	stroke_simplify(&s);
-	smp.ofs += s.n;
-	return s.n;
+	return smp.n;
 }
 
 static void new_point(Vec2 v)

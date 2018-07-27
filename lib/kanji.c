@@ -18,58 +18,105 @@
 #include <math.h>
 #include <string.h>
 
-static void simplify_aux(Stroke *s, uint a, uint b)
-{
-	Vec2 A, B, C;
-	uint m, i;
-	double sum, d2, il2, max;
+#define ABS_TOLERANCE 0.001
+#define REL_TOLERANCE 0.001
 
-	if (b - a <= 1) { /* it's simple already */
-		s->p[s->n++] = s->p[b];
+/* li = index of the first vertex in our interval */
+/* ri = index of the vertex right after our interval */
+static void simplify_aux(Stroke *stroke, uint li, uint ri, double tol)
+{
+	Vec2 L, M, R, Dir, M_proj;
+	uint pivot, mi;
+	double pivot_dist, len, dist, lr_len;
+
+	if (li == ri) {
+		stroke->p[stroke->n++] = stroke->p[ri];
+		DEBUG("PUT %i\n", ri);
 		return;
 	}
 
-	max = 0;
-	m = a+1;
-	sum = 0;
-	A = s->p[a];
-	B = s->p[b];
-	B.x -= A.x; B.y -= A.y;
-	il2 = 1./(B.x*B.x + B.y*B.y);
-	DEBUG("SIMPLIFY %u -- %u\n", a, b);
-	DEBUG("DISTANCES:\n");
-	ran (i, a+1, b-1) {
-		C = s->p[i];
-		C.x -= A.x; C.y -= A.y;
-		d2 = (C.x*B.x + C.y*B.y)*il2; /* projection */
-		/* Also we should check for d2 < 0 and d2 > 1,
-		   but it works well anyway. */
-		C.x -= B.x*d2; C.y -= B.y*d2;
-		d2 = C.x*C.x + C.y*C.y;
-		sum += d2;
-		DEBUG("\t%u %lf\n", i+1, d2);
-		if (d2 > max) {
-			max = d2;
-			m = i;
+	L = stroke->p[li-1];
+	R = stroke->p[ri];
+	Dir.x = R.x - L.x;
+	Dir.y = R.y - L.y;
+	lr_len = sqrt(Dir.x*Dir.x + Dir.y*Dir.y);
+	Dir.x /= lr_len;
+	Dir.y /= lr_len;
+
+	/* find the furthest point from line segment LR */
+	pivot = -1;
+	pivot_dist = 0.0;
+	for (mi = li; mi < ri; mi++) {
+		M = stroke->p[mi];
+
+		/* project M onto LR */
+		len = (M.x - L.x)*Dir.x + (M.y - L.y)*Dir.y;
+		if (len < 0.0)
+			len = 0.0;
+		if (len > lr_len)
+			len = lr_len;
+		M_proj.x = L.x + len*Dir.x;
+		M_proj.y = L.y + len*Dir.y;
+
+		/* the line segment M'M */
+		M_proj.x -= M.x;
+		M_proj.y -= M.y;
+
+		dist = M_proj.x*M_proj.x + M_proj.y*M_proj.y;
+		if (dist > pivot_dist) {
+			pivot = mi;
+			pivot_dist = dist;
 		}
 	}
-	sum /= b - a; /* perhaps use real length? */
-	DEBUG("MSE %lf\n", sum);
-	if (sum < 0.0001) { /* straigthen the segment */
-		s->p[s->n++] = s->p[b];
-	} else { /* subdivide the segment */
-		simplify_aux(s, a, m);
-		simplify_aux(s, m, b);
+
+	DEBUG("SIMPL %i..%i: PIVOT %i DIST %lf\n", li, ri, pivot, pivot_dist);
+
+	if (pivot_dist < tol) {
+		stroke->p[stroke->n++] = stroke->p[ri];
+		DEBUG("PUT %i\n", ri);
+	} else {
+		simplify_aux(stroke, li, pivot, tol);
+		simplify_aux(stroke, pivot+1, ri, tol);
 	}
 }
 
 void stroke_simplify(Stroke *s)
 {
-	uint tmp = s->n-1;
-	if (!s->n)
+	Vec2 D;
+	double g_len, tol;
+	uint i, n;
+
+	n = s->n;
+	if (n <= 1)
 		return;
+
+	g_len = 0.0;
+	for (i = 0; i < n-1; i++) {
+		D.x = s->p[i].x - s->p[i+1].x;
+		D.y = s->p[i].y - s->p[i+1].y;
+		g_len += sqrt(D.x*D.x + D.y*D.y);
+	}
 	s->n = 1;
-	simplify_aux(s, 0, tmp);
+	tol = g_len * REL_TOLERANCE;
+	if (tol < ABS_TOLERANCE)
+		tol = ABS_TOLERANCE;
+	simplify_aux(s, 1, n-1, tol);
+	#if 0 /* bad idea */
+	g_len = 0.0;
+	for (i = 0; i < n-1; i++) {
+		D.x = s->p[i].x - s->p[i+1].x;
+		D.y = s->p[i].y - s->p[i+1].y;
+		g_len += sqrt(D.x*D.x + D.y*D.y);
+	}
+	if (s->n >= 3) {
+		/* clean up short tails at the end of a stroke */
+		D.x = s->p[s->n-2].x - s->p[s->n-1].x;
+		D.y = s->p[s->n-2].y - s->p[s->n-1].y;
+		len = sqrt(D.x*D.x + D.y*D.y);
+		if (len*20 < g_len)
+			s->n--;
+	}
+	#endif
 }
 
 void kanji_normalize(Kanji *_k)
@@ -106,4 +153,6 @@ void kanji_normalize(Kanji *_k)
 		s[j].p[k].x = scale.x * (s[j].p[k].x + shift.x);
 		s[j].p[k].y = scale.y * (s[j].p[k].y + shift.y);
 	}
+	rep (j, n)
+		stroke_simplify(&s[j]);
 }
